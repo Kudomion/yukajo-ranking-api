@@ -10,10 +10,12 @@ namespace YKJProAPI.Controllers;
 public class RankingController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration _configuration;
 
-    public RankingController(AppDbContext db)
+    public RankingController(AppDbContext db, IConfiguration configuration)
     {
         _db = db;
+        _configuration = configuration;
     }
 
     // POST match result: api/ranking/result
@@ -30,6 +32,27 @@ public class RankingController : ControllerBase
         // Token Validation:
         if (winner.Token != request.Token && loser.Token != request.Token)
             return Unauthorized("Invalid Community Token.");
+
+        if (string.IsNullOrEmpty(request.Category) || request.Category == "None")
+            return Ok(new { message = "Unranked Match - Not Recorded" });
+
+        // Daily duel limit check:
+        int dailyLimit = int.Parse(_configuration["DAILY_DUEL_LIMIT"] ?? "4");
+        var today = DateTime.UtcNow.Date;
+
+        string p1 = winner.Username;
+        string p2 = loser.Username;
+
+        // Count duels between these two players today
+        int todayCount = await _db.DuelLogs.CountAsync(d =>
+            ((d.Player1 == p1 && d.Player2 == p2) ||
+             (d.Player1 == p2 && d.Player2 == p1)) &&
+            d.PlayedAt.Date == today);
+
+        if (todayCount >= dailyLimit)
+            return BadRequest($"Daily duel limit ({dailyLimit}) reached between {p1} and {p2}.");
+
+        // TODO when needed => Extra Layer of Validation: if reporter is the token holder (Prevent unauth updates to API results).
 
         // Save match:
         var match = new Match()

@@ -12,5 +12,7 @@ public class AppDbContext : DbContext
     public DbSet<Match> Matches { get; set; }
 
     public DbSet<Ranking> Rankings { get; set; }
+
+    public DbSet<DuelLog> DuelLogs { get; set; }    
 }
 
