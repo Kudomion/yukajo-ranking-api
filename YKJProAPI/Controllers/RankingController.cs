@@ -29,10 +29,15 @@ public class RankingController : ControllerBase
         if (winner == null || loser == null)
             return BadRequest("One or both players not found in community database.");
 
-        // Token Validation:
-        if (winner.Token != request.Token && loser.Token != request.Token)
-            return Unauthorized("Invalid Community Token.");
+        // Token Validation () => Replaced By Client Secret below:
+        /*if (winner.Token != request.Cli && loser.Token != request.Token)
+            return Unauthorized("Invalid Community Token.");*/
 
+        // Validate Client Secret (proves request came from your game):
+        var expectedSecret = _configuration["CLIENT_SECRET"];
+        if (request.ClientSecret != expectedSecret)
+            return Unauthorized("Invalid Client Secret.");
+        
         if (string.IsNullOrEmpty(request.Category) || request.Category == "None")
             return Ok(new { message = "Unranked Match - Not Recorded" });
 
@@ -51,8 +56,6 @@ public class RankingController : ControllerBase
 
         if (todayCount >= dailyLimit)
             return BadRequest($"Daily duel limit ({dailyLimit}) reached between {p1} and {p2}.");
-
-        // TODO when needed => Extra Layer of Validation: if reporter is the token holder (Prevent unauth updates to API results).
 
         // Save match:
         var match = new Match()

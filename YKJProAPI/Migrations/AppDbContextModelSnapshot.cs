@@ -76,10 +76,6 @@ namespace YKJProAPI.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("TEXT");

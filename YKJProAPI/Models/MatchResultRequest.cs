@@ -6,7 +6,7 @@ public class MatchResultRequest
 
     public string Loser { get; set; } = "";
 
-    public string Token { get; set; } = "";
+    public string ClientSecret { get; set; } = "";
 
-    public string Category { get; set; } = "";
+    public string Category { get; set; } = "TCG";
 }

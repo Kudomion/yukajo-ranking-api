@@ -6,8 +6,6 @@ public class Player
 
     public string Username { get; set; } = "";
 
-    public string Token { get; set; } = "";
-
     public string DiscordId { get; set; } = "";
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

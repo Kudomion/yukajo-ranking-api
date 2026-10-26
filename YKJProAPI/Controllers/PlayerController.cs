@@ -36,11 +36,10 @@ public class PlayerController : ControllerBase
         }
 
         // Generate token automatically
-        player.Token = Guid.NewGuid().ToString("N")[..8].ToUpper();
         player.CreatedAt = DateTime.UtcNow;
         _db.Players.Add(player);
         await _db.SaveChangesAsync();
-        return Ok(new { message = "Player added!", token = player.Token });
+        return Ok(new { message = "Player added!", name = player.Username});
     }
 
     // GET: api/player/all
