@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>لوحة تحكم YKJPro</title>
+  <link rel="stylesheet" href="admin.css">
+  <script src="admin.js" defer></script>
+</head>
+<body>
+
+  <!-- Login -->
+  <section id="login-view" class="card login" hidden>
+    <h1>لوحة تحكم YKJPro</h1>
+    <form id="login-form" autocomplete="off">
+      <label for="login-token">الرمز السري للمشرف</label>
+      <input id="login-token" type="password" required maxlength="512" autocomplete="current-password">
+      <button type="submit">دخول</button>
+      <p id="login-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Main -->
+  <div id="app-view" hidden>
+    <header class="topbar">
+      <h1>لوحة تحكم YKJPro</h1>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab active" data-tab="players">اللاعبون</button>
+        <button type="button" class="tab" data-tab="points">النقاط</button>
+        <button type="button" class="tab" data-tab="matches">المباريات</button>
+        <button type="button" class="tab" data-tab="audit">سجل التغييرات</button>
+      </nav>
+      <button type="button" id="logout" class="secondary">خروج</button>
+    </header>
+
+    <p id="flash" class="flash" role="status" hidden></p>
+
+    <!-- Players -->
+    <section id="tab-players" class="card tab-panel">
+      <div class="panel-head">
+        <h2>اللاعبون</h2>
+        <label class="inline"><input type="checkbox" id="show-inactive"> إظهار المعطّلين</label>
+        <button type="button" id="add-player">+ إضافة لاعب</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>الاسم في اللعبة</th><th>Discord</th><th>الفئات</th><th>الحالة</th>
+              <th>TCG</th><th>Anime</th><th>Community</th><th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="players-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Points -->
+    <section id="tab-points" class="card tab-panel" hidden>
+      <h2>تعديل النقاط</h2>
+      <form id="points-form" class="form-grid">
+        <label for="pts-player">اللاعب</label>
+        <select id="pts-player" required></select>
+
+        <label for="pts-category">الفئة</label>
+        <select id="pts-category" required>
+          <option value="TCG">TCG</option>
+          <option value="Anime">Anime</option>
+          <option value="Community">Community</option>
+        </select>
+
+        <span>النقاط الحالية</span>
+        <strong id="pts-current">—</strong>
+
+        <span>العملية</span>
+        <div class="radios">
+          <label><input type="radio" name="pts-mode" value="adjust" checked> إضافة / خصم (+/-)</label>
+          <label><input type="radio" name="pts-mode" value="set"> تعيين قيمة</label>
+        </div>
+
+        <label for="pts-value">القيمة</label>
+        <input id="pts-value" type="number" step="1" required dir="ltr" placeholder="+50 أو -30">
+
+        <label for="pts-reason">السبب (مطلوب)</label>
+        <input id="pts-reason" type="text" required maxlength="300">
+
+        <span></span>
+        <button type="submit">حفظ</button>
+      </form>
+    </section>
+
+    <!-- Matches -->
+    <section id="tab-matches" class="card tab-panel" hidden>
+      <div class="panel-head">
+        <h2>آخر المباريات</h2>
+        <button type="button" id="reload-matches" class="secondary">تحديث</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>الوقت</th><th>الفئة</th><th>الفائز</th><th>الخاسر</th><th>النقاط</th><th>الحالة</th><th></th></tr>
+          </thead>
+          <tbody id="matches-body"></tbody>
+        </table>
+      </div>
+
+      <h3>نتائج بانتظار تأكيد الخصم</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الوقت</th><th>الفئة</th><th>الفائز</th><th>الخاسر</th></tr></thead>
+          <tbody id="pending-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Audit -->
+    <section id="tab-audit" class="card tab-panel" hidden>
+      <div class="panel-head">
+        <h2>سجل التغييرات</h2>
+        <button type="button" id="reload-audit" class="secondary">تحديث</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>الوقت</th><th>بواسطة</th><th>العملية</th><th>الهدف</th><th>القيمة السابقة</th><th>القيمة الجديدة</th><th>السبب</th></tr>
+          </thead>
+          <tbody id="audit-body"></tbody>
+        </table>
+      </div>
+      <button type="button" id="audit-more" class="secondary" hidden>عرض المزيد</button>
+    </section>
+  </div>
+
+  <!-- Add / edit player -->
+  <dialog id="player-dialog">
+    <form id="player-form" method="dialog" class="form-grid">
+      <h2 id="player-dialog-title" class="span2">إضافة لاعب</h2>
+
+      <label for="pl-username">الاسم في اللعبة</label>
+      <input id="pl-username" type="text" required maxlength="20" dir="auto">
+
+      <label for="pl-discord">Discord</label>
+      <input id="pl-discord" type="text" maxlength="64" dir="ltr">
+
+      <span>الفئات</span>
+      <div class="radios">
+        <label><input type="checkbox" name="pl-cat" value="TCG" checked> TCG</label>
+        <label><input type="checkbox" name="pl-cat" value="Anime" checked> Anime</label>
+        <label><input type="checkbox" name="pl-cat" value="Community" checked> Community</label>
+      </div>
+
+      <span>الحالة</span>
+      <label class="inline"><input type="checkbox" id="pl-active" checked> نشط</label>
+
+      <label for="pl-reason">السبب (اختياري)</label>
+      <input id="pl-reason" type="text" maxlength="300">
+
+      <p id="player-error" class="error span2" role="alert"></p>
+
+      <div class="actions span2">
+        <button type="submit" value="save">حفظ</button>
+        <button type="button" id="player-cancel" class="secondary">إلغاء</button>
+      </div>
+    </form>
+  </dialog>
+
+</body>
+</html>

@@ -17,6 +17,71 @@ namespace YKJProAPI.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");
 
+            modelBuilder.Entity("YKJProAPI.Models.AuditLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorIp")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NewValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OldValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TargetId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TargetName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("YKJProAPI.Models.DailyLimitReset", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ResetAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId");
+
+                    b.ToTable("DailyLimitResets");
+                });
+
             modelBuilder.Entity("YKJProAPI.Models.DuelLog", b =>
                 {
                     b.Property<int>("Id")
@@ -49,18 +114,69 @@ namespace YKJProAPI.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("HasDeltas")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsUndone")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("LoserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LoserPointsDelta")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("PlayedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UndoReason")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UndoneAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("WinnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("WinnerPointsDelta")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("PlayedAt");
+
                     b.ToTable("Matches");
+                });
+
+            modelBuilder.Entity("YKJProAPI.Models.PendingResult", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Loser")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ReportedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReporterIp")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Winner")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportedAt");
+
+                    b.ToTable("PendingResults");
                 });
 
             modelBuilder.Entity("YKJProAPI.Models.Player", b =>
@@ -69,6 +185,12 @@ namespace YKJProAPI.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Categories")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("TCG,Anime,Community");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -76,11 +198,18 @@ namespace YKJProAPI.Migrations
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Username");
 
                     b.ToTable("Players");
                 });
@@ -108,6 +237,8 @@ namespace YKJProAPI.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("PlayerId", "Category");
 
                     b.ToTable("Rankings");
                 });

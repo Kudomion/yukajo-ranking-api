@@ -1,0 +1,170 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1d2330;
+  --muted: #667085;
+  --border: #d8dce3;
+  --accent: #2f5bd3;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --ok: #1e8e4e;
+  --flash-bg: #e8f5ec;
+  --flash-err-bg: #fdecea;
+  --row-off: #f0f1f4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --card: #1d222b;
+    --text: #e6e9ef;
+    --muted: #98a2b3;
+    --border: #343b47;
+    --accent: #5b82ee;
+    --accent-text: #ffffff;
+    --danger: #ef6b5e;
+    --ok: #4cc27d;
+    --flash-bg: #173324;
+    --flash-err-bg: #3a1d1a;
+    --row-off: #262b35;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 "Segoe UI", Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+}
+
+[hidden] { display: none !important; }
+
+h1 { font-size: 20px; margin: 0; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+h3 { font-size: 15px; margin: 20px 0 8px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto 16px;
+}
+
+.login { max-width: 380px; margin-top: 10vh; }
+.login h1 { margin-bottom: 16px; }
+.login form { display: grid; gap: 10px; }
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto 16px;
+}
+.topbar h1 { margin-inline-end: auto; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tab {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.tab.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.panel-head h2 { margin: 0 0 0 auto; }
+
+input, select, button {
+  font: inherit;
+  color: inherit;
+}
+input[type="text"], input[type="password"], input[type="number"], select {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+button {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+}
+button.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+button.small { padding: 3px 9px; font-size: 13px; }
+button:disabled { opacity: .5; cursor: default; }
+
+.inline { display: inline-flex; align-items: center; gap: 6px; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 420px);
+  gap: 10px 14px;
+  align-items: center;
+}
+.form-grid .span2 { grid-column: 1 / -1; }
+.radios { display: flex; flex-wrap: wrap; gap: 14px; }
+.actions { display: flex; gap: 8px; }
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td {
+  text-align: start;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.num { font-variant-numeric: tabular-nums; }
+td.json { font-family: Consolas, monospace; font-size: 12px; direction: ltr; text-align: left; max-width: 280px; word-break: break-word; }
+td.actions-cell { white-space: nowrap; }
+td.actions-cell button { margin-inline-end: 4px; }
+tr.off td { background: var(--row-off); color: var(--muted); }
+
+.badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; border: 1px solid var(--border); }
+.badge.on { color: var(--ok); border-color: var(--ok); }
+.badge.off { color: var(--muted); }
+.badge.undone { color: var(--danger); border-color: var(--danger); }
+
+.error { color: var(--danger); min-height: 1.2em; margin: 0; }
+.flash {
+  max-width: 1200px;
+  margin: 0 auto 16px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--flash-bg);
+}
+.flash.err { background: var(--flash-err-bg); color: var(--danger); }
+
+.empty { color: var(--muted); text-align: center; padding: 18px; }
+
+dialog {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  padding: 18px;
+  width: min(620px, calc(100vw - 32px));
+}
+dialog::backdrop { background: rgba(0, 0, 0, .45); }

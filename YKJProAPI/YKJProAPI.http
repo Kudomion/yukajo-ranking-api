@@ -1,6 +1,6 @@
 @YKJProAPI_HostAddress = http://localhost:5093
 
-GET {{YKJProAPI_HostAddress}}/weatherforecast/
+GET {{YKJProAPI_HostAddress}}/api/ranking/tcg
 Accept: application/json
 
 ###

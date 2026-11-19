@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using YKJProAPI.Data;
 using YKJProAPI.Models;
+using YKJProAPI.Services;
 
 namespace YKJProAPI.Controllers;
 
@@ -11,129 +14,148 @@ public class RankingController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<RankingController> _logger;
 
-    public RankingController(AppDbContext db, IConfiguration configuration)
+    public RankingController(AppDbContext db, IConfiguration configuration, ILogger<RankingController> logger)
     {
         _db = db;
         _configuration = configuration;
+        _logger = logger;
     }
 
     // POST match result: api/ranking/result
+    //
+    // Both players' clients send the same result after a ranked duel.
+    // The first report is stored as pending; the matching second report records the match once.
+    // The game client looks for these substrings in the response, so keep them stable:
+    //   "Daily duel limit", "pending", "confirmed".
     [HttpPost("result")]
     public async Task<IActionResult> PostResult([FromBody] MatchResultRequest request)
     {
-        // Find winner and loser by username:
-        var winner = await _db.Players.FirstOrDefaultAsync(p => p.Username == request.Winner);
-        var loser = await _db.Players.FirstOrDefaultAsync(p => p.Username == request.Loser);
+        // Validate Client Secret (proves request came from the game client):
+        var expectedSecret = _configuration["CLIENT_SECRET"];
+        if (string.IsNullOrEmpty(expectedSecret) || !SecretEquals(expectedSecret, request.ClientSecret))
+            return Unauthorized("Invalid Client Secret.");
+
+        if (string.IsNullOrEmpty(request.Category) || request.Category == "None")
+            return Ok(new { message = "Unranked Match - Not Recorded" });
+
+        var category = RankCategories.Normalize(request.Category);
+        if (category == null)
+            return BadRequest("Invalid category.");
+
+        // Find winner and loser by username (exact in-game nickname):
+        var winner = await _db.Players.FirstOrDefaultAsync(p => p.Username == request.Winner && p.IsActive);
+        var loser = await _db.Players.FirstOrDefaultAsync(p => p.Username == request.Loser && p.IsActive);
 
         if (winner == null || loser == null)
             return BadRequest("One or both players not found in community database.");
 
-        // Token Validation () => Replaced By Client Secret below:
-        /*if (winner.Token != request.Cli && loser.Token != request.Token)
-            return Unauthorized("Invalid Community Token.");*/
+        if (winner.Id == loser.Id)
+            return BadRequest("Winner and loser must be different players.");
 
-        // Validate Client Secret (proves request came from your game):
-        var expectedSecret = _configuration["CLIENT_SECRET"];
-        if (request.ClientSecret != expectedSecret)
-            return Unauthorized("Invalid Client Secret.");
-        
-        if (string.IsNullOrEmpty(request.Category) || request.Category == "None")
-            return Ok(new { message = "Unranked Match - Not Recorded" });
+        foreach (var p in new[] { winner, loser })
+            if (!RankCategories.Parse(p.Categories).Contains(category))
+                return BadRequest($"Player {p.Username} is not registered for {category} ranking.");
 
-        // Daily duel limit check:
-        int dailyLimit = int.Parse(_configuration["DAILY_DUEL_LIMIT"] ?? "4");
-        var today = DateTime.UtcNow.Date;
+        int dailyLimit = int.TryParse(_configuration["DAILY_DUEL_LIMIT"], out var dl) && dl > 0 ? dl : 4;
+        int windowMinutes = int.TryParse(_configuration["RESULT_CONFIRM_MINUTES"], out var wm) && wm > 0 ? wm : 5;
+        var now = DateTime.UtcNow;
 
-        string p1 = winner.Username;
-        string p2 = loser.Username;
-
-        // Count duels between these two players today
-        int todayCount = await _db.DuelLogs.CountAsync(d =>
-            ((d.Player1 == p1 && d.Player2 == p2) ||
-             (d.Player1 == p2 && d.Player2 == p1)) &&
-            d.PlayedAt.Date == today);
-
-        if (todayCount >= dailyLimit)
-            return BadRequest($"Daily duel limit ({dailyLimit}) reached between {p1} and {p2}.");
-
-        // Save match:
-        var match = new Match()
+        await RankingRules.Lock.WaitAsync();
+        try
         {
-            WinnerId = winner.Id,
-            LoserId = loser.Id,
-            Category = request.Category,
-            PlayedAt = DateTime.UtcNow
-        };
-        await _db.Matches.AddAsync(match);
+            // Drop unconfirmed reports that are too old to be confirmed.
+            var cutoff = now.AddMinutes(-windowMinutes);
+            await _db.PendingResults.Where(p => p.ReportedAt < cutoff).ExecuteDeleteAsync();
 
-        // Update Rankings:
-        await UpdateRanking(winner.Id, request.Category, true);
-        await UpdateRanking(loser.Id, request.Category, false);
+            // Daily duel limit between these two players (any category):
+            int todayCount = await RankingRules.CountDuelsInWindow(_db, winner.Id, loser.Id);
+            if (todayCount >= dailyLimit)
+                return BadRequest($"Daily duel limit ({dailyLimit}) reached between {winner.Username} and {loser.Username}.");
 
-        await _db.SaveChangesAsync();
-        return Ok(new { message =  "Match recorded successfully!" });
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var pending = await _db.PendingResults
+                .Where(p => p.Winner == winner.Username && p.Loser == loser.Username && p.Category == category)
+                .OrderBy(p => p.ReportedAt)
+                .FirstOrDefaultAsync();
+
+            if (pending == null)
+            {
+                _db.PendingResults.Add(new PendingResult
+                {
+                    Winner = winner.Username,
+                    Loser = loser.Username,
+                    Category = category,
+                    ReportedAt = now,
+                    ReporterIp = ip
+                });
+                await _db.SaveChangesAsync();
+                return Ok(new { message = "Result pending: waiting for opponent confirmation." });
+            }
+
+            if (pending.ReporterIp != null && pending.ReporterIp == ip)
+                _logger.LogInformation("Result {Winner} > {Loser} confirmed from the same IP as the first report.", winner.Username, loser.Username);
+
+            _db.PendingResults.Remove(pending);
+
+            var (winnerDelta, loserDelta) = await RankingRules.ApplyMatch(_db, winner.Id, loser.Id, category);
+            _db.Matches.Add(new Match
+            {
+                WinnerId = winner.Id,
+                LoserId = loser.Id,
+                Category = category,
+                PlayedAt = now,
+                HasDeltas = true,
+                WinnerPointsDelta = winnerDelta,
+                LoserPointsDelta = loserDelta
+            });
+
+            await _db.SaveChangesAsync();
+            return Ok(new { message = "Result confirmed and recorded." });
+        }
+        finally
+        {
+            RankingRules.Lock.Release();
+        }
     }
 
     // GET duelist ranking -> api/ranking/tcg
     [HttpGet("{category}")]
     public async Task<IActionResult> GetRanking(string category)
     {
-        var rankings = await _db.Rankings
+        var canonical = RankCategories.Normalize(category);
+
+        var rows = await _db.Rankings
             .Where(r => r.Category.ToLower() == category.ToLower())
-            .OrderByDescending(r => r.Points)
-            .Join(_db.Players, r => r.PlayerId, p => p.Id,
-            (r, p) => new
-            {
-                rank = 0,
-                name = p.Username,
-                wins = r.Wins,
-                losses = r.Losses,
-                points = r.Points
-            })
+            .Join(_db.Players.Where(p => p.IsActive), r => r.PlayerId, p => p.Id,
+                (r, p) => new { p.Username, p.Categories, r.Wins, r.Losses, r.Points })
             .ToListAsync();
 
-        // Adding Ranking Numbers:
-        var ranked = rankings.Select((r, i) => new
-        {
-            rank = i + 1,
-            r.name,
-            r.wins,
-            r.losses,
-            r.points,
-        });
+        // Hide players an admin removed from this category; ties broken by wins, then fewer losses, then name.
+        var ranked = rows
+            .Where(r => canonical == null || RankCategories.Parse(r.Categories).Contains(canonical))
+            .OrderByDescending(r => r.Points)
+            .ThenByDescending(r => r.Wins)
+            .ThenBy(r => r.Losses)
+            .ThenBy(r => r.Username, StringComparer.Ordinal)
+            .Select((r, i) => new
+            {
+                rank = i + 1,
+                name = r.Username,
+                wins = r.Wins,
+                losses = r.Losses,
+                points = r.Points,
+            });
 
         return Ok(ranked);
     }
 
-
-    private async Task UpdateRanking(int playerId, string category, bool isWin)
+    private static bool SecretEquals(string expected, string? actual)
     {
-        var ranking = await _db.Rankings
-            .FirstOrDefaultAsync(r => r.PlayerId == playerId && r.Category == category);
-
-        if (ranking == null)
-        {
-            ranking = new Ranking()
-            {
-                PlayerId = playerId,
-                Category = category,
-
-            };
-            _db.Rankings.Add(ranking);
-        }
-
-        if (isWin)
-        {
-            ranking.Wins++;
-            ranking.Points += 100;
-        }
-        else
-        {
-            ranking.Losses++;
-
-            // -30 points dedcuted per loss
-            ranking.Points = Math.Max(0, ranking.Points - 30);
-        }
+        if (actual == null) return false;
+        return CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(expected)),
+            SHA256.HashData(Encoding.UTF8.GetBytes(actual)));
     }
 }
