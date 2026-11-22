@@ -16,6 +16,7 @@ if (!string.IsNullOrEmpty(dbDir)) Directory.CreateDirectory(dbDir);
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlite($"Data Source={dbPath}"));
 builder.Services.AddSingleton<AdminAuth>();
+builder.Services.AddHostedService<DailyBackup>();   // a copy of the database every day (backups/ next to DB_PATH, 7 kept)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 

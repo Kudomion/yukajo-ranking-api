@@ -151,6 +151,40 @@ public class RankingController : ControllerBase
         return Ok(ranked);
     }
 
+    // GET recorded matches between two players -> api/ranking/matches?player1=KUDO&player2=Spells&since=2026-11-22T10:00:00Z
+    //
+    // Read-only, like the leaderboard. Newest first, at most 20, undone matches left out.
+    // YukajoTalk uses it to finish a ranked duel with the exact result (who won, when).
+    [HttpGet("matches")]
+    public async Task<IActionResult> GetMatches([FromQuery] string? player1, [FromQuery] string? player2,
+        [FromQuery] DateTime? since, [FromQuery] string? category)
+    {
+        if (string.IsNullOrWhiteSpace(player1) || string.IsNullOrWhiteSpace(player2))
+            return BadRequest("player1 and player2 are needed.");
+        string a = player1.Trim().ToLower(), b = player2.Trim().ToLower();
+        var players = await _db.Players.Where(p => p.Username.ToLower() == a || p.Username.ToLower() == b)
+            .Select(p => new { p.Id, p.Username }).ToListAsync();
+        var first = players.FirstOrDefault(p => p.Username.ToLower() == a);
+        var second = players.FirstOrDefault(p => p.Username.ToLower() == b);
+        if (first == null || second == null || first.Id == second.Id) return Ok(Array.Empty<object>());
+
+        var query = _db.Matches.Where(m => !m.IsUndone &&
+            ((m.WinnerId == first.Id && m.LoserId == second.Id) || (m.WinnerId == second.Id && m.LoserId == first.Id)));
+        if (since is { } from) query = query.Where(m => m.PlayedAt >= from.ToUniversalTime());
+        if (RankCategories.Normalize(category) is { } cat) query = query.Where(m => m.Category == cat);
+
+        var names = players.ToDictionary(p => p.Id, p => p.Username);
+        var rows = await query.OrderByDescending(m => m.PlayedAt).Take(20).ToListAsync();
+        return Ok(rows.Select(m => new
+        {
+            id = m.Id,
+            winner = names[m.WinnerId],
+            loser = names[m.LoserId],
+            category = m.Category,
+            playedAt = DateTime.SpecifyKind(m.PlayedAt, DateTimeKind.Utc),
+        }));
+    }
+
     private static bool SecretEquals(string expected, string? actual)
     {
         if (actual == null) return false;
